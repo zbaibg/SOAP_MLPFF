@@ -1,4 +1,6 @@
+import glob
 import pickle
+import re
 from model import train_it,set_device_for_model,EnergyForceModel
 from dataprocess import set_device_for_dataprocess,read_dataset,get_energy_per_atom,get_all_elements
 import numpy as np
@@ -28,8 +30,14 @@ empty_model=EnergyForceModel(hidden_size, allelements, cutoff, n_max, l_max)
 
 if __name__ == '__main__':
     if mode == 'cross-validation':
-        # Cross-validation mode
+        files=glob.glob('best_fold*_cust_model_checkpoint_epoch_*.pt')
+        finished_folds=[]    
+        for file in files:
+            fold_finish=re.search(r'best_fold(\d+)_cust_model_checkpoint_epoch_(\d+).pt',file).group(1)
+            finished_folds.append(int(fold_finish))
         for fold in range(1, fold_of_cross_validation+1):
+            if fold in finished_folds:
+                continue
             print(f"Running fold {fold}/{fold_of_cross_validation}")
             test_indices_path = f'bondenergy_test_indices_fold{fold}.pt'
             train_indices_path = f'bondenergy_train_indices_fold{fold}.pt'
@@ -63,6 +71,7 @@ if __name__ == '__main__':
                     energy_bins_to_sample_trainset,
                     early_stopping_patience,
                     model_save_prefix=f"fold{fold}_")
+        print(f"Finished {fold_of_cross_validation} folds")
     else:
         # holdout mode
         train_indices_path='bondenergy_train_indices.pt'

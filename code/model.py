@@ -274,8 +274,8 @@ def load_model(empty_model,file_of_parameter):
     empty_model.load_state_dict(torch.load(file_of_parameter)['model_state_dict'])
     return empty_model.to(_get_device_for_model())
 
-def get_the_checkpoint_path_of_latest_epoch():
-    checkpoint_files = glob.glob('cust_model_checkpoint_epoch_*.pt')
+def get_the_checkpoint_path_of_latest_epoch(prefix=None):
+    checkpoint_files = glob.glob(f'{prefix}cust_model_checkpoint_epoch_*.pt')
 
     # Extract epoch numbers and find the latest
     last_epoch = -1
@@ -287,7 +287,7 @@ def get_the_checkpoint_path_of_latest_epoch():
                 last_epoch = max(last_epoch, epoch)
                 
     if last_epoch>0:
-        return f'cust_model_checkpoint_epoch_{last_epoch}.pt',last_epoch
+        return f'{prefix}cust_model_checkpoint_epoch_{last_epoch}.pt',last_epoch
     else:
         return None
     
@@ -296,14 +296,15 @@ def get_the_checkpoint_path_of_latest_epoch():
 def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None):
     set_device_for_dataprocess(_get_device_for_model())
     empty_model = EnergyForceModel(hidden_size=hidden_size,allelements=allelements,cutoff=cutoff,n_max=n_max,l_max=l_max).to(_get_device_for_model())
-    if get_the_checkpoint_path_of_latest_epoch() is None:
+    if get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix) is None:
         optimizer = create_or_load_optimizer(empty_model,lr_for_new_optimizer=initial_lr)
         model=empty_model
         last_epoch=None
     else:
-        model=load_model(empty_model,file_of_parameter=get_the_checkpoint_path_of_latest_epoch()[0]).to(_get_device_for_model())
-        optimizer = create_or_load_optimizer(model,file_of_parameter=get_the_checkpoint_path_of_latest_epoch()[0],lr_for_new_optimizer=initial_lr)
-        last_epoch=get_the_checkpoint_path_of_latest_epoch()[1]
+        print(f'Found checkpoint of epoch {get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix)[1]}. Start training from the next epoch.')
+        model=load_model(empty_model,file_of_parameter=get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix)[0]).to(_get_device_for_model())
+        optimizer = create_or_load_optimizer(model,file_of_parameter=get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix)[0],lr_for_new_optimizer=initial_lr)
+        last_epoch=get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix)[1]
         if set_lr_for_mid_epoch:
             set_lr_for_optimizer(optimizer,initial_lr)
     # Train the model
