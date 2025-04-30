@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from e3nn.o3 import spherical_harmonics
 import numpy as np
-np.set_printoptions(threshold=np.inf)  # threshold设为无穷大
+#np.set_printoptions(threshold=np.inf)  # threshold设为无穷大
 
 try:
     from torch_cluster import radius_graph  # optional, for fast neighbour search

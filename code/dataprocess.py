@@ -1,9 +1,5 @@
 # Standard library imports
-import glob
-import os
 import pickle
-import re
-import time
 import random
 
 # Third party imports
@@ -11,13 +7,8 @@ import ase
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from dscribe.descriptors import SOAP
 from tqdm.auto import tqdm
 
-# Local imports
-from soap_torch import SoapLayer
 device_for_dataprocess=None
 def set_device_for_dataprocess(device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
     global device_for_dataprocess

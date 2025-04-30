@@ -3,6 +3,7 @@
 import glob
 import os
 import re
+import shutil
 
 # Third party import
 import torch
@@ -110,7 +111,7 @@ class EnergyForceModel(nn.Module):
         total_loss = weight_energy * energy_loss +  weight_force * force_loss
         return total_loss,energy_loss,force_loss
 
-def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_saved_epoch, epochs, weight_energy,weight_force,energy_bins_to_sample_trainset=None):
+def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_saved_epoch, epochs, weight_energy,weight_force,energy_bins_to_sample_trainset=None, early_stopping_patience=None,model_save_prefix=None):
 
     train_total_losses = []
     train_energy_losses = []
@@ -128,6 +129,17 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
     val_dataset_loader= torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=pad)    
     if last_saved_epoch is None:
         last_saved_epoch=0
+
+    # Early stopping variables
+    best_val_loss = float('inf')
+    patience_counter = 0
+    best_avg_train_total_loss = None
+    best_avg_train_energy_loss = None
+    best_avg_train_force_loss = None
+    best_avg_val_total_loss = None
+    best_avg_val_energy_loss = None
+    best_avg_val_force_loss = None
+
     for epoch in range(last_saved_epoch+1,epochs):
         assert not os.path.exists(f'cust_model_checkpoint_epoch_{epoch}.pt'),f"Checkpoint for epoch {epoch} exist, please delete it first"
         model.train()
@@ -149,9 +161,9 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
                 # Backward pass
                 total_loss.backward()
                 optimizer.step()
-                train_total_loss += total_loss.item()
-                train_energy_loss += energy_loss.item()
-                train_force_loss += force_loss.item()
+                train_total_loss += float(total_loss.item())
+                train_energy_loss += float(energy_loss.item())
+                train_force_loss += float(force_loss.item())
                 pbar_train_batch.set_postfix(train_loss=total_loss.item(),train_energy_loss=energy_loss.item(),train_force_loss=force_loss.item())
                 pbar_train_batch.update(1) 
             avg_train_total_loss = train_total_loss / len(train_dataset_loader)
@@ -176,9 +188,9 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
                     mask = batch['mask']
                     # Calculate loss using defined loss function
                     total_loss,energy_loss,force_loss = model.loss_function(pred_energy, pred_forces, true_energy, true_forces,mask,weight_energy,weight_force)
-                    val_total_loss += total_loss.item()
-                    val_energy_loss += energy_loss.item()
-                    val_force_loss += force_loss.item()
+                    val_total_loss += float(total_loss.item())
+                    val_energy_loss += float(energy_loss.item())
+                    val_force_loss += float(force_loss.item())
                     pbar_val_batch.set_postfix(val_loss=total_loss.item(),val_energy_loss=energy_loss.item(),val_force_loss=force_loss.item())
                     pbar_val_batch.update(1)
                 avg_val_total_loss = val_total_loss / len(val_dataset_loader)
@@ -188,35 +200,63 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
                 val_energy_losses.append(avg_val_energy_loss)
                 val_force_losses.append(avg_val_force_loss)
             scheduler.step(avg_val_total_loss)
-
-            # Save model checkpoint after each epoch
-            checkpoint = {
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_loss': avg_train_total_loss,
-                'train_energy_loss': avg_train_energy_loss,
-                'train_force_loss': avg_train_force_loss,
-                'val_loss': avg_val_total_loss,
-                'val_energy_loss': avg_val_energy_loss,
-                'val_force_loss': avg_val_force_loss,
-                'lr': optimizer.param_groups[0]['lr']
-            }
-            # Save losses to a separate file for easier access later
-            losses = {
-                'epoch': epoch,
-                'train_loss': avg_train_total_loss,
-                'train_energy_loss': avg_train_energy_loss, 
-                'train_force_loss': avg_train_force_loss,
-                'val_loss': avg_val_total_loss,
-                'val_energy_loss': avg_val_energy_loss,
-                'val_force_loss': avg_val_force_loss,
-                'lr': optimizer.param_groups[0]['lr']
-            }
-            torch.save(losses, f'losses_epoch_{epoch}.pt')
-            torch.save(checkpoint, f'cust_model_checkpoint_epoch_{epoch}.pt')
-        print(f'Epoch {epoch}: Train Loss: {avg_train_total_loss:.4e}, Train Energy Loss: {avg_train_energy_loss:.4e}, Train Force Loss: {avg_train_force_loss:.4e}, Val Loss: {avg_val_total_loss:.4e}, Val Energy Loss: {avg_val_energy_loss:.4e}, Val Force Loss: {avg_val_force_loss:.4e}, LR: {optimizer.param_groups[0]["lr"]:.4e}')
+        save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=model_save_prefix)
+        # Early stopping check
+        if early_stopping_patience is not None:
+            if avg_val_total_loss < best_val_loss:
+                best_val_loss = avg_val_total_loss
+                patience_counter = 0
+                best_model_state = model.state_dict()
+                best_optimizer_state = optimizer.state_dict()
+                best_epoch = epoch
+                best_avg_train_total_loss = avg_train_total_loss
+                best_avg_train_energy_loss = avg_train_energy_loss
+                best_avg_train_force_loss = avg_train_force_loss
+                best_avg_val_total_loss = avg_val_total_loss
+                best_avg_val_energy_loss = avg_val_energy_loss
+                best_avg_val_force_loss = avg_val_force_loss
+            else:
+                patience_counter += 1
+                if patience_counter >= early_stopping_patience:
+                    print(f"Early stopping triggered after {epoch} epochs, the best epoch is {best_epoch}")
+                    # Restore best model
+                    model.load_state_dict(best_model_state)
+                    optimizer.load_state_dict(best_optimizer_state)
+                    save_checkpoint(model,optimizer,best_epoch,best_avg_train_total_loss,best_avg_train_energy_loss,best_avg_train_force_loss,best_avg_val_total_loss,best_avg_val_energy_loss,best_avg_val_force_loss,prefix=f'best_{model_save_prefix}')
+                    break
     return model
+
+def save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=None):
+    # Save model checkpoint after each epoch
+    model_file_name = f'{prefix}cust_model_checkpoint_epoch_{epoch}.pt'
+    losses_file_name = f'{prefix}losses_epoch_{epoch}.pt'
+    print(f'Saving {model_file_name}: Train Loss: {avg_train_total_loss:.4e}, Train Energy Loss: {avg_train_energy_loss:.4e}, Train Force Loss: {avg_train_force_loss:.4e}, Val Loss: {avg_val_total_loss:.4e}, Val Energy Loss: {avg_val_energy_loss:.4e}, Val Force Loss: {avg_val_force_loss:.4e}, LR: {optimizer.param_groups[0]["lr"]:.4e}')
+
+    checkpoint = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'train_loss': avg_train_total_loss,
+        'train_energy_loss': avg_train_energy_loss,
+        'train_force_loss': avg_train_force_loss,
+        'val_loss': avg_val_total_loss,
+        'val_energy_loss': avg_val_energy_loss,
+        'val_force_loss': avg_val_force_loss,
+        'lr': optimizer.param_groups[0]['lr']
+    }
+    # Save losses to a separate file for easier access later
+    losses = {
+        'epoch': epoch,
+        'train_loss': avg_train_total_loss,
+        'train_energy_loss': avg_train_energy_loss, 
+        'train_force_loss': avg_train_force_loss,
+        'val_loss': avg_val_total_loss,
+        'val_energy_loss': avg_val_energy_loss,
+        'val_force_loss': avg_val_force_loss,
+        'lr': optimizer.param_groups[0]['lr']
+    }
+    torch.save(losses, losses_file_name)
+    torch.save(checkpoint, model_file_name)
 def create_or_load_optimizer(model,file_of_parameter=None,lr_for_new_optimizer=0.001):
     '''
     model: the model to be used for creating the optimizer, but the parameter of the optimizer can be loaded from the file_of_parameter
@@ -253,7 +293,7 @@ def get_the_checkpoint_path_of_latest_epoch():
     
     
     
-def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None):
+def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None):
     set_device_for_dataprocess(_get_device_for_model())
     empty_model = EnergyForceModel(hidden_size=hidden_size,allelements=allelements,cutoff=cutoff,n_max=n_max,l_max=l_max).to(_get_device_for_model())
     if get_the_checkpoint_path_of_latest_epoch() is None:
@@ -277,7 +317,9 @@ def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_m
         epochs=epochs,
         weight_energy=weight_energy,
         weight_force=weight_force,
-        energy_bins_to_sample_trainset=energy_bins_to_sample_trainset
+        energy_bins_to_sample_trainset=energy_bins_to_sample_trainset,
+        early_stopping_patience=early_stopping_patience,
+        model_save_prefix=model_save_prefix
     )
     print("Training completed!")
 
