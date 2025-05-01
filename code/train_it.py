@@ -9,7 +9,9 @@ set_device_for_model()
 
 # Configuration parameters
 mode = 'cross-validation' # 'cross-validation' or 'holdout'
-fold_of_cross_validation=10 # only used when mode is 'cross-validation'
+#fold_of_cross_validation=10 # only used when mode is 'cross-validation'
+cross_validation_fold_list = [1,2,3,4,5,6,7,8,9,10]
+
 if mode == 'cross-validation':
     save_unconverged_models=False # if False only save the best model to save space
 else:
@@ -39,10 +41,10 @@ if __name__ == '__main__':
         for file in files:
             fold_finish=re.search(r'best_fold(\d+)_cust_model_checkpoint_epoch_(\d+).pt',file).group(1)
             finished_folds.append(int(fold_finish))
-        for fold in range(1, fold_of_cross_validation+1):
+        for fold in cross_validation_fold_list:
             if fold in finished_folds:
                 continue
-            print(f"Running fold {fold}/{fold_of_cross_validation}")
+            print(f"Running fold {fold}")
             test_indices_path = f'bondenergy_test_indices_fold{fold}.pt'
             train_indices_path = f'bondenergy_train_indices_fold{fold}.pt'
             
@@ -75,7 +77,7 @@ if __name__ == '__main__':
                     energy_bins_to_sample_trainset,
                     early_stopping_patience,
                     model_save_prefix=f"fold{fold}_")
-        print(f"Finished {fold_of_cross_validation} folds")
+        print(f"All Finished")
     else:
         # holdout mode
         train_indices_path='bondenergy_train_indices.pt'
