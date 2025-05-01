@@ -203,7 +203,7 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
         if save_unconverged_models:
             save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=model_save_prefix,only_save_losses=False)
         else:
-            save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=f'best_{model_save_prefix}',only_save_losses=True)
+            save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=model_save_prefix,only_save_losses=True)
         # Early stopping check
         if early_stopping_patience is not None:
             if avg_val_total_loss < best_val_loss:
