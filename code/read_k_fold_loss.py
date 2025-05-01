@@ -2,11 +2,12 @@ import torch
 import glob
 import pandas as pd
 from model import load_model
+from train_it import empty_model
 df=pd.DataFrame(columns=['fold','epoch','train_loss','train_energy_loss','train_force_loss','val_loss','val_energy_loss','val_force_loss','learning_rate','trainable_parameter'])
 fold_cross_validation=10
 
-model_file=glob.glob('best_fold*_losses_epoch_*.pt')[0]
-model=load_model(model_file)
+model_file=glob.glob('best_fold*_cust_model_checkpoint_epoch_*.pt')[0]
+model=load_model(empty_model,model_file)
 trainable_parameter=sum(p.numel() for p in model.energy_net.parameters() if p.requires_grad)
 for i in range(1,fold_cross_validation+1):
     files=glob.glob(f'best_fold{i}_losses_epoch_*.pt')
