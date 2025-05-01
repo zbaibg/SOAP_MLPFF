@@ -233,7 +233,10 @@ def save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_
     # Save model checkpoint after each epoch
     model_file_name = f'{prefix}cust_model_checkpoint_epoch_{epoch}.pt'
     losses_file_name = f'{prefix}losses_epoch_{epoch}.pt'
-    print(f'Saving {model_file_name}: Train Loss: {avg_train_total_loss:.4e}, Train Energy Loss: {avg_train_energy_loss:.4e}, Train Force Loss: {avg_train_force_loss:.4e}, Val Loss: {avg_val_total_loss:.4e}, Val Energy Loss: {avg_val_energy_loss:.4e}, Val Force Loss: {avg_val_force_loss:.4e}, LR: {optimizer.param_groups[0]["lr"]:.4e}')
+    if only_save_losses:
+        print(f'Saving {losses_file_name}: Train Loss: {avg_train_total_loss:.4e}, Train Energy Loss: {avg_train_energy_loss:.4e}, Train Force Loss: {avg_train_force_loss:.4e}, Val Loss: {avg_val_total_loss:.4e}, Val Energy Loss: {avg_val_energy_loss:.4e}, Val Force Loss: {avg_val_force_loss:.4e}, LR: {optimizer.param_groups[0]["lr"]:.4e}')
+    else:
+        print(f'Saving {model_file_name} and {losses_file_name}: Train Loss: {avg_train_total_loss:.4e}, Train Energy Loss: {avg_train_energy_loss:.4e}, Train Force Loss: {avg_train_force_loss:.4e}, Val Loss: {avg_val_total_loss:.4e}, Val Energy Loss: {avg_val_energy_loss:.4e}, Val Force Loss: {avg_val_force_loss:.4e}, LR: {optimizer.param_groups[0]["lr"]:.4e}')
 
     checkpoint = {
         'epoch': epoch,
