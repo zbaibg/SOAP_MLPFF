@@ -10,6 +10,10 @@ set_device_for_model()
 # Configuration parameters
 mode = 'cross-validation' # 'cross-validation' or 'holdout'
 fold_of_cross_validation=10 # only used when mode is 'cross-validation'
+if mode == 'cross-validation':
+    save_unconverged_models=False # if False only save the best model to save space
+else:
+    save_unconverged_models=True # if True save all models
 molecule_list_path='bondenergy_molecule_list_cust.pkl'
 hidden_size=1024
 cutoff=6
@@ -103,4 +107,5 @@ if __name__ == '__main__':
                 set_lr_for_mid_epoch,
                 energy_bins_to_sample_trainset,
                 early_stopping_patience,
-                model_save_prefix='')
+                model_save_prefix='',
+                save_unconverged_models=save_unconverged_models)

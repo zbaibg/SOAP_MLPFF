@@ -111,7 +111,7 @@ class EnergyForceModel(nn.Module):
         total_loss = weight_energy * energy_loss +  weight_force * force_loss
         return total_loss,energy_loss,force_loss
 
-def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_saved_epoch, epochs, weight_energy,weight_force,energy_bins_to_sample_trainset=None, early_stopping_patience=None,model_save_prefix=None):
+def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_saved_epoch, epochs, weight_energy,weight_force,energy_bins_to_sample_trainset=None, early_stopping_patience=None,model_save_prefix=None,save_unconverged_models=False):
 
     train_total_losses = []
     train_energy_losses = []
@@ -200,7 +200,10 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
                 val_energy_losses.append(avg_val_energy_loss)
                 val_force_losses.append(avg_val_force_loss)
             scheduler.step(avg_val_total_loss)
-        save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=model_save_prefix)
+        if save_unconverged_models:
+            save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=model_save_prefix,only_save_losses=False)
+        else:
+            save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=f'best_{model_save_prefix}',only_save_losses=True)
         # Early stopping check
         if early_stopping_patience is not None:
             if avg_val_total_loss < best_val_loss:
@@ -226,7 +229,7 @@ def train_model(model,optimizer, train_dataset, test_dataset,batch_size, last_sa
                     break
     return model
 
-def save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=None):
+def save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_loss,avg_train_force_loss,avg_val_total_loss,avg_val_energy_loss,avg_val_force_loss,prefix=None,only_save_losses=False):
     # Save model checkpoint after each epoch
     model_file_name = f'{prefix}cust_model_checkpoint_epoch_{epoch}.pt'
     losses_file_name = f'{prefix}losses_epoch_{epoch}.pt'
@@ -255,8 +258,11 @@ def save_checkpoint(model,optimizer,epoch,avg_train_total_loss,avg_train_energy_
         'val_force_loss': avg_val_force_loss,
         'lr': optimizer.param_groups[0]['lr']
     }
-    torch.save(losses, losses_file_name)
-    torch.save(checkpoint, model_file_name)
+    if only_save_losses:
+        torch.save(losses, losses_file_name)
+    else:
+        torch.save(checkpoint, model_file_name)
+        torch.save(losses, losses_file_name)
 def create_or_load_optimizer(model,file_of_parameter=None,lr_for_new_optimizer=0.001):
     '''
     model: the model to be used for creating the optimizer, but the parameter of the optimizer can be loaded from the file_of_parameter
@@ -293,7 +299,7 @@ def get_the_checkpoint_path_of_latest_epoch(prefix=None):
     
     
     
-def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None):
+def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None,save_unconverged_models=False):
     set_device_for_dataprocess(_get_device_for_model())
     empty_model = EnergyForceModel(hidden_size=hidden_size,allelements=allelements,cutoff=cutoff,n_max=n_max,l_max=l_max).to(_get_device_for_model())
     if get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix) is None:
@@ -320,7 +326,8 @@ def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_m
         weight_force=weight_force,
         energy_bins_to_sample_trainset=energy_bins_to_sample_trainset,
         early_stopping_patience=early_stopping_patience,
-        model_save_prefix=model_save_prefix
+        model_save_prefix=model_save_prefix,
+        save_unconverged_models=save_unconverged_models
     )
     print("Training completed!")
 
