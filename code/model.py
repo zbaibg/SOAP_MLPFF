@@ -29,7 +29,7 @@ def _get_device_for_model():
     return device_for_model
 
 class EnergyForceModel(nn.Module):
-    def __init__(self, hidden_size,allelements,cutoff,n_max,l_max,debug=False):
+    def __init__(self, hidden_size,hidden_layer_num,allelements,cutoff,n_max,l_max,debug=False):
         super().__init__()
         self.debug = debug
         #self.log_sigma_e = nn.Parameter(torch.tensor(0.0))
@@ -46,16 +46,11 @@ class EnergyForceModel(nn.Module):
             nn.Linear(self.soaplayer.desc_dim, hidden_size),
             #nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            #nn.BatchNorm1d(hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            #nn.BatchNorm1d(hidden_size),
-            nn.ReLU(),
-            #nn.Dropout(0.1),
-            nn.Linear(hidden_size, hidden_size),
-            #nn.BatchNorm1d(hidden_size),
-            nn.ReLU(),
+            *[layer for _ in range(hidden_layer_num-1) for layer in [
+                nn.Linear(hidden_size, hidden_size),
+                #nn.BatchNorm1d(hidden_size),
+                nn.ReLU()
+            ]],
             nn.Linear(hidden_size, 1)
             )
         print('trainable parameters: ',sum(p.numel() for p in self.energy_net.parameters() if p.requires_grad))
@@ -302,9 +297,9 @@ def get_the_checkpoint_path_of_latest_epoch(prefix=None):
     
     
     
-def train_it(train_dataset,test_dataset,allelements,hidden_size,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None,save_unconverged_models=False):
+def train_it(train_dataset,test_dataset,allelements,hidden_size,hidden_layer_num,cutoff,n_max,l_max,batch_size,epochs,weight_energy,weight_force,initial_lr=0.001,set_lr_for_mid_epoch=False,energy_bins_to_sample_trainset=None,early_stopping_patience=None,model_save_prefix=None,save_unconverged_models=False):
     set_device_for_dataprocess(_get_device_for_model())
-    empty_model = EnergyForceModel(hidden_size=hidden_size,allelements=allelements,cutoff=cutoff,n_max=n_max,l_max=l_max).to(_get_device_for_model())
+    empty_model = EnergyForceModel(hidden_size=hidden_size,hidden_layer_num=hidden_layer_num,allelements=allelements,cutoff=cutoff,n_max=n_max,l_max=l_max).to(_get_device_for_model())
     if get_the_checkpoint_path_of_latest_epoch(prefix=model_save_prefix) is None:
         optimizer = create_or_load_optimizer(empty_model,lr_for_new_optimizer=initial_lr)
         model=empty_model

@@ -18,6 +18,7 @@ else:
     save_unconverged_models=True # if True save all models
 molecule_list_path='bondenergy_molecule_list_cust.pkl'
 hidden_size=1024
+hidden_layer_num=4
 cutoff=6
 n_max=3
 l_max=3
@@ -32,7 +33,7 @@ early_stopping_patience=30 # None if early_stopping_patience is not used
 
 molecule_list=pickle.load(open(molecule_list_path,'rb'))
 allelements=get_all_elements(molecule_list)
-empty_model=EnergyForceModel(hidden_size, allelements, cutoff, n_max, l_max)
+empty_model=EnergyForceModel(hidden_size,hidden_layer_num, allelements, cutoff, n_max, l_max)
 
 if __name__ == '__main__':
     if mode == 'cross-validation':
@@ -60,12 +61,14 @@ if __name__ == '__main__':
             print(f'Fold {fold} - test_dataset atom number: {sum([len(molecule["elements"]) for molecule in test_dataset])}')
             
             # Create an empty model for other model to import when loading checkpoints
-            empty_model = EnergyForceModel(hidden_size, allelements, cutoff, n_max, l_max)
+            empty_model = EnergyForceModel(hidden_size, hidden_layer_num, allelements, cutoff, n_max, l_max)
             
             train_it(train_dataset,
                     test_dataset,
                     allelements,
-                    hidden_size, cutoff,
+                    hidden_size,
+                    hidden_layer_num,
+                    cutoff,
                     n_max,
                     l_max,
                     batch_size,
@@ -98,7 +101,9 @@ if __name__ == '__main__':
         train_it(train_dataset,
                 test_dataset,
                 allelements,
-                hidden_size, cutoff,
+                hidden_size,
+                hidden_layer_num,
+                cutoff,
                 n_max,
                 l_max,
                 batch_size,
