@@ -275,7 +275,7 @@ def set_lr_for_optimizer(optimizer,lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 def load_model(empty_model,file_of_parameter):
-    empty_model.load_state_dict(torch.load(file_of_parameter)['model_state_dict'])
+    empty_model.load_state_dict(torch.load(file_of_parameter,map_location=_get_device_for_model())['model_state_dict'])
     return empty_model.to(_get_device_for_model())
 
 def get_the_checkpoint_path_of_latest_epoch(prefix=None):
